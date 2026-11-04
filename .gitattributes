@@ -1,0 +1,3 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+include/tqdm/unicode_tables.hpp linguist-generated=true

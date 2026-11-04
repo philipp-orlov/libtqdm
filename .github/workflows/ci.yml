@@ -1,0 +1,89 @@
+# Linux is the supported platform: release, sanitizers and every language version,
+# with both compilers. macOS and Windows run too, to start those ports from a known
+# state; see docs/PORTING.md. They are allowed to fail until the port is declared
+# done, at which point `continue-on-error` goes.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: gcc-release, cxx: g++, type: Release, flags: ""}
+          - {name: clang-release, cxx: clang++, type: Release, flags: ""}
+          - {name: gcc-cxx20, cxx: g++, type: Debug, flags: "-DCMAKE_CXX_STANDARD=20"}
+          - {name: clang-cxx23, cxx: clang++, type: Debug, flags: "-DCMAKE_CXX_STANDARD=23"}
+          - {name: no-threads, cxx: g++, type: Debug, flags: "-DTQDM_NO_THREADS=ON"}
+          - name: asan-ubsan
+            cxx: g++
+            type: Debug
+            flags: "-DCMAKE_CXX_FLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer'"
+          - name: tsan
+            cxx: clang++
+            type: RelWithDebInfo
+            flags: "-DCMAKE_CXX_FLAGS='-fsanitize=thread -fno-omit-frame-pointer'"
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build tmux
+      # Newer kernels randomize addresses more than the sanitizer runtimes allow for.
+      - name: Address space for the sanitizers
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: Configure
+        run: >-
+          eval cmake -S . -B build -G Ninja -DTQDM_BUILD_BENCHMARKS=ON
+          -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DCMAKE_BUILD_TYPE=${{ matrix.type }} ${{ matrix.flags }}
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          TSAN_OPTIONS: halt_on_error=1
+        run: ctest --test-dir build --output-on-failure --timeout 300
+
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Format
+        run: git ls-files '*.hpp' '*.cpp' ':!include/tqdm/unicode_tables.hpp' | xargs clang-format --dry-run --Werror
+      # Keeps the headers independent of the compiler's source character set.
+      - name: Headers are ASCII
+        run: "! LC_ALL=C grep -rnP '[^\\x00-\\x7F]' include/"
+      # Keeps a port to one file.
+      - name: OS headers only in platform/
+        run: "! grep -nE '#include <(unistd|sys/|windows|poll|fcntl|termios)' include/tqdm/*.hpp"
+      - name: Generated tables are current
+        run: python3 tools/gen_unicode_tables.py | diff - include/tqdm/unicode_tables.hpp
+
+  macos:
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DTQDM_BUILD_BENCHMARKS=ON
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --timeout 300
+
+  windows:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DTQDM_BUILD_BENCHMARKS=ON
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 300

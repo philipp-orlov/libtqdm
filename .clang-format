@@ -1,0 +1,37 @@
+# The layout of libbufs: K&R braces everywhere, 120 columns.
+Language: Cpp
+BasedOnStyle: Google
+Standard: c++17
+
+ColumnLimit: 120
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+
+# `public:` / `private:` sit at the class's own indent level; case labels are indented.
+AccessModifierOffset: -4
+NamespaceIndentation: None
+IndentCaseLabels: true
+
+# Braces always attach, also for functions, classes and namespaces.
+BreakBeforeBraces: Attach
+
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortLambdasOnASingleLine: All
+PackConstructorInitializers: BinPack
+
+PointerAlignment: Left
+DerivePointerAlignment: false
+SeparateDefinitionBlocks: Leave
+SpacesBeforeTrailingComments: 1
+
+# Hand-drawn tables and box comments carry real information; leave comments exactly as written.
+ReflowComments: false
+
+# C system headers, then C++ standard headers, then project headers.
+IncludeBlocks: Regroup
+SortIncludes: CaseSensitive
