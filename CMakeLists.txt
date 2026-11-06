@@ -12,6 +12,11 @@
 cmake_minimum_required(VERSION 3.16...3.28)
 project(libtqdm VERSION 0.1.0 LANGUAGES CXX)
 
+# A build configured without a type gets Release: the templates are only fast, and the examples only small, optimized.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
+endif()
+
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     set(TQDM_TOP_LEVEL ON)
 else()
